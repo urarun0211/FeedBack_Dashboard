@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Dashboard</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui;
+      background: #f2fdf6;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #1b5e20;
+    }
+
+    .filterRow {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 8px 14px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .active {
+      background: #2e7d32;
+      color: white;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 10px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+    }
+
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #666;
+      margin-top: 8px;
+    }
+
+    .delete {
+      margin-top: 10px;
+      background: #d32f2f;
+      color: white;
+      border-radius: 6px;
+      padding: 6px 10px;
+    }
+
+    .complaint {
+      border-left: 5px solid #d32f2f;
+      background: #fff1f1;
+    }
+
+    .feedback {
+      border-left: 5px solid #2e7d32;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Admin Dashboard</h1>
+
+  <div class="filterRow">
+    <button onclick="setFilter('All')" id="btnAll" class="active">All</button>
+    <button onclick="setFilter('Feedback')" id="btnFeedback">Feedback</button>
+    <button onclick="setFilter('Complaint')" id="btnComplaint">Complaint</button>
+  </div>
+
+  <div id="list"></div>
+
+  <script>
+    const API_URL = "https://feedback-txmi.onrender.com";
+    let allData = [];
+    let currentFilter = "All";
+
+    function setFilter(type) {
+      currentFilter = type;
+      document.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+      document.getElementById("btn" + type).classList.add("active");
+      render();
+    }
+
+    async function fetchData() {
+      try {
+        const res = await fetch(API_URL + "/feedback");
+        allData = await res.json();
+        render();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function deleteItem(id) {
+      if (!confirm("Are you sure?")) return;
+
+      await fetch(API_URL + "/feedback/" + id, {
+        method: "DELETE"
+      });
+
+      fetchData();
+    }
+
+    function render() {
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+
+      const filtered = currentFilter === "All"
+        ? allData
+        : allData.filter(item => item.type === currentFilter);
+
+      if (filtered.length === 0) {
+        list.innerHTML = "<p>No feedback found</p>";
+        return;
+      }
+
+      filtered.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "card " + (item.type === "Complaint" ? "complaint" : "feedback");
+
+        div.innerHTML = `
+          <div>${item.message}</div>
+          <div class="meta">
+            <span><strong>${item.type}</strong></span>
+            <span>${new Date(item.time).toLocaleString()}</span>
+          </div>
+          <button class="delete" onclick="deleteItem('${item._id}')">Delete</button>
+        `;
+
+        list.appendChild(div);
+      });
+    }
+
+    fetchData();
+    setInterval(fetchData, 5000); // auto refresh every 5 sec
+  </script>
+
+</body>
+</html>
