@@ -85,92 +85,110 @@
   <div id="list"></div>
 
   <script>
-    const API_URL = "https://feedback-txmi.onrender.com";
-    let allData = [];
-    let currentFilter = "All";
+  const API_URL = "https://feedback-txmi.onrender.com";
+  let allData = [];
+  let currentFilter = "All";
 
-    function setFilter(type) {
-      currentFilter = type;
-      document.querySelectorAll(".filterRow button")
-        .forEach(b => b.classList.remove("active"));
-      document.getElementById("btn" + type).classList.add("active");
+  function setFilter(type) {
+    currentFilter = type;
+    document.querySelectorAll(".filterRow button")
+      .forEach(b => b.classList.remove("active"));
+    document.getElementById("btn" + type).classList.add("active");
+    render();
+  }
+
+  // ✅ Load from Cache First
+  function loadFromCache() {
+    const cached = localStorage.getItem("feedbackCache");
+    if (cached) {
+      allData = JSON.parse(cached);
       render();
     }
+  }
 
-    async function fetchData() {
-      try {
-        const res = await fetch(API_URL + "/feedback");
-        allData = await res.json();
+  // ✅ Save to Cache
+  function saveToCache(data) {
+    localStorage.setItem("feedbackCache", JSON.stringify(data));
+  }
 
-        // 🔥 Latest first sorting
-        allData.sort((a, b) => {
-          const dateA = new Date(a.createdAt || a.time || 0);
-          const dateB = new Date(b.createdAt || b.time || 0);
-          return dateB - dateA;
-        });
+  async function fetchData() {
+    try {
+      const res = await fetch(API_URL + "/feedback");
+      const freshData = await res.json();
 
-        render();
-      } catch (err) {
-        console.error("Fetch Error:", err);
-      }
-    }
-
-    async function deleteItem(id) {
-      if (!confirm("Are you sure?")) return;
-
-      await fetch(API_URL + "/feedback/" + id, {
-        method: "DELETE"
+      // Sort latest first
+      freshData.sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.time || 0);
+        const dateB = new Date(b.createdAt || b.time || 0);
+        return dateB - dateA;
       });
 
-      fetchData();
+      allData = freshData;
+      saveToCache(freshData); // ✅ Save in localStorage
+      render();
+    } catch (err) {
+      console.error("Fetch Error:", err);
     }
+  }
 
-    function formatDate(item) {
-      const rawDate = item.createdAt || item.time;
-      if (!rawDate) return "No Date";
+  async function deleteItem(id) {
+    if (!confirm("Are you sure?")) return;
 
-      const d = new Date(rawDate);
-      if (isNaN(d)) return "No Date";
-
-      return d.toLocaleString();
-    }
-
-    function render() {
-      const list = document.getElementById("list");
-      list.innerHTML = "";
-
-      const filtered = currentFilter === "All"
-        ? allData
-        : allData.filter(item => item.type === currentFilter);
-
-      if (filtered.length === 0) {
-        list.innerHTML = "<p>No feedback found</p>";
-        return;
-      }
-
-      filtered.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "card " +
-          (item.type === "Complaint" ? "complaint" : "feedback");
-
-        div.innerHTML = `
-          <div>${item.message}</div>
-          <div class="meta">
-            <span><strong>${item.type}</strong></span>
-            <span>${formatDate(item)}</span>
-          </div>
-          <button class="delete" onclick="deleteItem('${item._id}')">
-            Delete
-          </button>
-        `;
-
-        list.appendChild(div);
-      });
-    }
+    await fetch(API_URL + "/feedback/" + id, {
+      method: "DELETE"
+    });
 
     fetchData();
-    setInterval(fetchData, 5000);
-  </script>
+  }
+
+  function formatDate(item) {
+    const rawDate = item.createdAt || item.time;
+    if (!rawDate) return "No Date";
+
+    const d = new Date(rawDate);
+    if (isNaN(d)) return "No Date";
+
+    return d.toLocaleString();
+  }
+
+  function render() {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+
+    const filtered = currentFilter === "All"
+      ? allData
+      : allData.filter(item => item.type === currentFilter);
+
+    if (filtered.length === 0) {
+      list.innerHTML = "<p>No feedback found</p>";
+      return;
+    }
+
+    filtered.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "card " +
+        (item.type === "Complaint" ? "complaint" : "feedback");
+
+      div.innerHTML = `
+        <div>${item.message}</div>
+        <div class="meta">
+          <span><strong>${item.type}</strong></span>
+          <span>${formatDate(item)}</span>
+        </div>
+        <button class="delete" onclick="deleteItem('${item._id}')">
+          Delete
+        </button>
+      `;
+
+      list.appendChild(div);
+    });
+  }
+
+  // 🔥 First Load
+  loadFromCache();   // show cached instantly
+  fetchData();       // then fetch fresh
+  setInterval(fetchData, 5000);
+</script>
 
 </body>
 </html>
